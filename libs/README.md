@@ -4,7 +4,7 @@ These files are loaded by `saveinstance.luau` from Gitee so the script does not 
 
 | File | Upstream source |
 | --- | --- |
-| `StreamBuffer.luau` | https://github.com/rbxlx/SomeHub |
+| `StreamBufferLib.luau` | https://github.com/rbxlx/SomeHub |
 | `UniversalMethodFinder.luau` | https://github.com/rbxlx/SomeHub |
 | `Base64.luau` | https://github.com/daily3014/rbx-algorithms |
 | `llz4.luau` | https://github.com/RiskoZS/llz4 |

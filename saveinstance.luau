@@ -62,11 +62,9 @@ local service = setmetatable({}, {
 
 local StreamBuffer
 do
-	local filename = "StreamBuffer"
-
 	StreamBuffer = loadstring(
-		game:HttpGet(USSI_REPO_URL .. "libs/" .. filename .. ".luau", true),
-		filename
+		game:HttpGet(USSI_REPO_URL .. "libs/StreamBufferLib.luau", true),
+		"StreamBuffer"
 	)()
 end
 
