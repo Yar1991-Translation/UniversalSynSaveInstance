@@ -3656,12 +3656,15 @@ end
 --- @field CompressionMode string | boolean -- How to compress (make smaller) the binary file: `"zstd"`, `"lz4"`, or `false` for no compression. `true` means `"zstd"`. The old option `DisableCompression = true` means `false`. ___Default:___ `"zstd"`
 --- @field CompressionLevel number -- Compression level for zstd, from -7 to 22. A higher level makes a smaller file but takes longer. This is ignored for lz4 and when compression is off. ___Default:___ 9
 --- @field FilePath string | false -- File name to save to. You can include a folder. If the name has no extension, the script adds one based on `Binary` and `IsModel`. If you set this, the script overwrites an existing file and ignores `AvoidFileOverwrite`. ___Default:___ false
+--- @field ExportFolder string | false -- Directory where the exported file is placed. The directory is created automatically when the executor supports `makefolder`. A relative path is resolved from the executor's workspace folder; an absolute path (`/...` or `C:/...`) is used as-is when the executor supports it. If `FilePath` is absolute, `FilePath` wins. ___Default:___ false
 --- @field SafeMode boolean -- Disconnect the LocalPlayer from the game when saving starts. This turns on `KillAllScripts` and `BoostFPS` unless you set them yourself. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field KillAllScripts boolean -- Close or disable other running scripts before saving. `SafeMode` turns this on. Some games stop responding to input after this. That is normal. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field BoostFPS boolean -- Turn off 3D rendering while saving, then turn it back on. `SafeMode` turns this on. ___Default:___ false
 --- @field Object Instance | false -- Save this [Instance] instead of the whole place. The script saves a model if you do not set `IsModel = false`. If you pass `game`, it saves the place and uses `full` mode. You must pass an [Instance], not a name. ___Default:___ false
 --- @field IsModel boolean -- Save a model (`.rbxm`/`.rbxmx`) instead of a place (`.rbxl`/`.rbxlx`). `Object` turns this on unless you set it yourself. Passing a list of Instances as an argument also turns it on. ___Default:___ false
---- @field ShowStatus boolean -- Show a status label on the screen. It shows the size while saving, then the final size and time. ___Default:___ true
+--- @field ShowStatus boolean -- Show a status label and an export progress bar on the screen. It shows the size and percentage while saving, then the final size and time. ___Default:___ true
+--- @field TestOnlyNotice boolean -- Show a test-only / legal notice before saving starts. It states that the tool is for testing only and that exported files must be deleted within 24 hours. The same notice is written into the generated README. ___Default:___ true
+--- @field TestOnlyNoticeTimeout number -- How many seconds the test-only notice waits before continuing automatically. Set to 0 or a negative number to wait for a button click. ___Default:___ 15
 --- @field ReadMe boolean -- Add a README script to the save. It contains save details (place ID, date, time, platform, executor, recovered scripts, warnings) and tips. ___Default:___ true
 --- @field Decompile boolean -- Turn the compiled script back into source code (decompile). This replaces the `Source` of each [LuaSourceContainer] with decompiled code. If this is off, `Source` says decompiling is disabled. ___Default:___ true
 --- @field SaveBytecode boolean -- If the executor supports `getscriptbytecode`, add the compiled script data (bytecode) to `Source` as a comment. You can decompile it later. This respects `DecompileIgnore`. ___Default:___ false
@@ -3719,6 +3722,7 @@ end
 --- @field Decompiler string -- `Decompile`
 --- @field DecompilerTimeout string -- `DecompileTimeout`
 --- @field EmbedBytecode string -- `SaveBytecode`
+--- @field ExportDirectory string -- `ExportFolder`
 --- @field FileName string -- `FilePath`
 --- @field IgnoreArchivable string -- `IgnoreNotArchivable`
 --- @field IgnoreClasses string -- `IgnoreList`
@@ -3729,15 +3733,21 @@ end
 --- @field InstanceIgnoreList string -- `IgnoreList`
 --- @field InstancesBlacklist string -- `IgnoreList`
 --- @field IsolatePlayerGui string -- `IsolateLocalPlayer`
+--- @field LegalNotice string -- `TestOnlyNotice`
 --- @field LocalPlayer string -- `IsolateLocalPlayer`
 --- @field Model string -- `Object`
+--- @field NoticeTimeout string -- `TestOnlyNoticeTimeout`
 --- @field NoXML string -- `Binary`
+--- @field OutputDirectory string -- `ExportFolder`
+--- @field OutputFolder string -- `ExportFolder`
 --- @field Path string -- `FilePath`
 --- @field Players string -- `IsolatePlayers`
 --- @field Progress string -- `ShowStatus`
 --- @field Root string -- `Object`
 --- @field SaveAsBinary string -- `Binary`
 --- @field SaveCharacters string -- `SavePlayerCharacters`
+--- @field SaveDirectory string -- `ExportFolder`
+--- @field SaveFolder string -- `ExportFolder`
 --- @field SaveLocalPlayer string -- `IsolateLocalPlayer`
 --- @field SaveModel string -- `Object`
 --- @field SaveNil string -- `NilInstances`
@@ -3749,9 +3759,11 @@ end
 --- @field SaveScripts string -- `Decompile`
 --- @field SaveStarterPlayer string -- `IsolateStarterPlayer`
 --- @field ScriptDecompile string -- `Decompile`
+--- @field ShowLegalNotice string -- `TestOnlyNotice`
 --- @field ShowProgress string -- `ShowStatus`
 --- @field Status string -- `ShowStatus`
 --- @field StatusText string -- `ShowStatus`
+--- @field TestOnly string -- `TestOnlyNotice`
 --- @field UseDecompiler string -- `Decompile`
 --- @field Verbose string -- `__DEBUG_MODE`
 --- @field timeout string -- `DecompileTimeout`
@@ -3778,7 +3790,7 @@ end
 	Save the current place, one [Instance], or a group of [Instance]s. Example:
 	```lua
 	local Params = {
-		RepoURL = "https://raw.githubusercontent.com/luau/UniversalSynSaveInstance/main/",
+		RepoURL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/",
 		SSI = "saveinstance",
 	}
 
@@ -3821,6 +3833,29 @@ local function synsaveinstance(...)
 	local totalsize = 0
 
 	local StatusText
+	local ProgressBar, ProgressFill, ProgressLabel
+	local lastProgressPercent = -1
+
+	-- * On-screen export progress (0..1). Does nothing when ShowStatus is off.
+	local function updateProgress(fraction)
+		if not ProgressFill then
+			return
+		end
+
+		if fraction then
+			fraction = math.clamp(fraction, 0, 1)
+
+			local percent = math.floor(fraction * 100 + 0.5)
+			if percent == lastProgressPercent then
+				return
+			end
+			lastProgressPercent = percent
+
+			ProgressBar.Visible = true
+			ProgressFill.Size = UDim2.new(fraction, 0, 1, 0)
+			ProgressLabel.Text = percent .. "%"
+		end
+	end
 
 	local OPTIONS = {
 		mode = "optimized",
@@ -3860,6 +3895,8 @@ local function synsaveinstance(...)
 
 		SaveCacheInterval = 0x1600 * 10,
 		ShowStatus = true,
+		TestOnlyNotice = true,
+		TestOnlyNoticeTimeout = 15,
 		KillAllScripts = false,
 		SafeMode = false,
 		BoostFPS = false,
@@ -3868,6 +3905,7 @@ local function synsaveinstance(...)
 		Anonymous = false,
 		ReadMe = true,
 		FilePath = false,
+		ExportFolder = false,
 		AvoidFileOverwrite = true,
 		Object = false,
 		IsModel = false,
@@ -3933,6 +3971,7 @@ local function synsaveinstance(...)
 			Decompiler = "Decompile",
 			DecompilerTimeout = "DecompileTimeout",
 			EmbedBytecode = "SaveBytecode",
+			ExportDirectory = "ExportFolder",
 			FileName = "FilePath",
 			IgnoreArchivable = "IgnoreNotArchivable",
 			IgnoreClasses = "IgnoreList",
@@ -3943,15 +3982,21 @@ local function synsaveinstance(...)
 			InstanceIgnoreList = "IgnoreList",
 			InstancesBlacklist = "IgnoreList",
 			IsolatePlayerGui = "IsolateLocalPlayer",
+			LegalNotice = "TestOnlyNotice",
 			LocalPlayer = "IsolateLocalPlayer",
 			Model = "Object",
+			NoticeTimeout = "TestOnlyNoticeTimeout",
 			NoXML = "Binary",
+			OutputDirectory = "ExportFolder",
+			OutputFolder = "ExportFolder",
 			Path = "FilePath",
 			Players = "IsolatePlayers",
 			Progress = "ShowStatus",
 			Root = "Object",
 			SaveAsBinary = "Binary",
 			SaveCharacters = "SavePlayerCharacters",
+			SaveDirectory = "ExportFolder",
+			SaveFolder = "ExportFolder",
 			SaveLocalPlayer = "IsolateLocalPlayer",
 			SaveModel = "Object",
 			SaveNil = "NilInstances",
@@ -3963,9 +4008,11 @@ local function synsaveinstance(...)
 			SaveScripts = "Decompile",
 			SaveStarterPlayer = "IsolateStarterPlayer",
 			ScriptDecompile = "Decompile",
+			ShowLegalNotice = "TestOnlyNotice",
 			ShowProgress = "ShowStatus",
 			Status = "ShowStatus",
 			StatusText = "ShowStatus",
+			TestOnly = "TestOnlyNotice",
 			UseDecompiler = "Decompile",
 			Verbose = "__DEBUG_MODE",
 			timeout = "DecompileTimeout",
@@ -4180,6 +4227,168 @@ local function synsaveinstance(...)
 
 		USSI.Running = nil
 		return error(text, 2)
+	end
+
+	-- * 仅供测试 / 法律合规提示
+	local LEGAL_NOTICE_TITLE = "仅供测试 / FOR TESTING ONLY"
+
+	local LEGAL_NOTICE_TEXT = table.concat({
+		"本工具仅供个人学习、研究与技术测试使用。",
+		"导出的文件可能包含受版权保护的内容，请勿用于商业用途、公开传播或任何侵犯他人权利的行为。",
+		"请在导出完成后 24 小时内删除全部导出文件。",
+		"继续使用即表示你已阅读本提示，并同意自行承担因使用本工具产生的一切法律责任。",
+		"",
+		"FOR TESTING ONLY. Exported files may contain copyrighted material.",
+		"Do not use them commercially or redistribute them.",
+		"Delete all exported files within 24 hours.",
+		"By continuing, you accept full responsibility for your use of this tool.",
+	}, "\n")
+
+	local LEGAL_README_TEXT = table.concat({
+		"!! 仅供测试 / FOR TESTING ONLY !!",
+		"",
+		"本工具仅供个人学习、研究与技术测试使用。",
+		"导出的文件可能包含受版权保护的内容，请在 24 小时内删除全部导出文件，",
+		"不得用于商业用途、公开传播或任何侵犯他人权利的行为。",
+		"使用者应自行承担因使用本工具产生的一切法律责任。",
+		"",
+		"FOR TESTING ONLY. Exported files may contain copyrighted material.",
+		"Delete all exported files within 24 hours. Do not redistribute or use them commercially.",
+	}, "\n")
+
+	local function showTestOnlyNotice()
+		if not OPTIONS.TestOnlyNotice then
+			return true
+		end
+
+		local gui, continueButton, cancelButton
+		local ok = pcall(function()
+			gui = Instance.new("ScreenGui")
+			gui.Name = "USSI_LegalNotice_" .. tostring(math.random(100000, 999999))
+			gui.DisplayOrder = 2e9
+			gui.IgnoreGuiInset = true
+			gui.ResetOnSpawn = false
+
+			local frame = Instance.new("Frame")
+			frame.AnchorPoint = Vector2.new(0.5, 0.5)
+			frame.Position = UDim2.fromScale(0.5, 0.5)
+			frame.Size = UDim2.new(0.9, 0, 0.8, 0)
+			frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+			frame.BackgroundTransparency = 0.03
+			frame.BorderSizePixel = 0
+			frame.Parent = gui
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 10)
+			corner.Parent = frame
+
+			local title = Instance.new("TextLabel")
+			title.BackgroundTransparency = 1
+			title.Position = UDim2.new(0, 20, 0, 14)
+			title.Size = UDim2.new(1, -40, 0, 34)
+			title.Font = Enum.Font.GothamBold
+			title.TextSize = 22
+			title.TextColor3 = Color3.fromRGB(255, 205, 70)
+			title.TextXAlignment = Enum.TextXAlignment.Left
+			title.Text = "⚠ " .. LEGAL_NOTICE_TITLE
+			title.Parent = frame
+
+			local body = Instance.new("TextLabel")
+			body.BackgroundTransparency = 1
+			body.Position = UDim2.new(0, 20, 0, 54)
+			body.Size = UDim2.new(1, -40, 1, -120)
+			body.Font = Enum.Font.SourceSans
+			body.TextSize = 16
+			body.TextWrapped = true
+			body.TextXAlignment = Enum.TextXAlignment.Left
+			body.TextYAlignment = Enum.TextYAlignment.Top
+			body.TextColor3 = Color3.fromRGB(235, 235, 240)
+			body.Text = LEGAL_NOTICE_TEXT
+			body.Parent = frame
+
+			local function makeButton(text, color, positionX, widthScale)
+				local button = Instance.new("TextButton")
+				button.AnchorPoint = Vector2.new(0.5, 1)
+				button.Position = UDim2.new(positionX, 0, 1, -14)
+				button.Size = UDim2.new(widthScale, 0, 0, 38)
+				button.BackgroundColor3 = color
+				button.BorderSizePixel = 0
+				button.Font = Enum.Font.SourceSansBold
+				button.TextSize = 16
+				button.TextColor3 = Color3.new(1, 1, 1)
+				button.Text = text
+				button.Parent = frame
+
+				local buttonCorner = Instance.new("UICorner")
+				buttonCorner.CornerRadius = UDim.new(0, 8)
+				buttonCorner.Parent = button
+
+				return button
+			end
+
+			cancelButton = makeButton("取消导出 / Cancel", Color3.fromRGB(95, 95, 105), 0.28, 0.28)
+			continueButton = makeButton(
+				"我已知晓并继续 / I Understand & Continue",
+				Color3.fromRGB(0, 162, 92),
+				0.64,
+				0.38
+			)
+
+			local parent = (global_container.gethui and global_container.gethui())
+				or game:GetService("CoreGui")
+			gui.Parent = parent
+		end)
+
+		if not ok or not gui or not continueButton or not cancelButton then
+			if gui then
+				pcall(function()
+					gui:Destroy()
+				end)
+			end
+			-- * GUI 不可用时至少把提示输出到控制台，不能静默继续
+			warn("[saveinstance] 仅供测试 / FOR TESTING ONLY:\n" .. LEGAL_NOTICE_TEXT)
+			return true
+		end
+
+		local continueClicked, cancelClicked = false, false
+		local continueConnection = continueButton.MouseButton1Click:Connect(function()
+			continueClicked = true
+		end)
+		local cancelConnection = cancelButton.MouseButton1Click:Connect(function()
+			cancelClicked = true
+		end)
+
+		local timeout = tonumber(OPTIONS.TestOnlyNoticeTimeout) or 15
+		local deadline = timeout > 0 and (os.clock() + timeout) or nil
+
+		while not continueClicked and not cancelClicked do
+			local remaining = deadline and (deadline - os.clock()) or nil
+			if remaining and remaining <= 0 then
+				-- * 超时视为已知晓，避免无人值守时永久卡住
+				continueClicked = true
+				break
+			end
+
+			if remaining then
+				continueButton.Text = string.format(
+					"我已知晓并继续 / I Understand & Continue (%d)",
+					math.ceil(remaining)
+				)
+			end
+
+			task.wait(0.1)
+		end
+
+		continueConnection:Disconnect()
+		cancelConnection:Disconnect()
+		gui:Destroy()
+
+		if cancelClicked then
+			warn("[saveinstance] 用户取消了导出 / Export cancelled at the test-only notice")
+			return false
+		end
+
+		return true
 	end
 
 	local InstancesOverrides = {}
@@ -4454,9 +4663,38 @@ local function synsaveinstance(...)
 
 		local filetype = OPTIONS.Binary and (IsModel and ".rbxm" or ".rbxl") or (IsModel and ".rbxmx" or ".rbxlx")
 
+		local ExportFolder = OPTIONS.ExportFolder
+		if type(ExportFolder) ~= "string" or ExportFolder == "" then
+			ExportFolder = nil
+		else
+			ExportFolder = string.gsub(ExportFolder, "\\", "/")
+			ExportFolder = string.gsub(ExportFolder, "/+$", "")
+			if ExportFolder == "" or ExportFolder == "." then
+				ExportFolder = nil
+			end
+		end
+
+		local function isAbsolutePath(path)
+			return string.sub(path, 1, 1) == "/"
+				or string.match(path, "^%a:[/\\]") ~= nil
+				or string.sub(path, 1, 2) == "\\\\"
+		end
+
+		local function applyExportFolder(path)
+			if not ExportFolder or isAbsolutePath(path) then
+				return path
+			end
+			return ExportFolder .. "/" .. path
+		end
+
+		if type(FilePath) ~= "string" or FilePath == "" then
+			FilePath = false
+		end
+
 		if FilePath then
 			local hasExtension = string.match(FilePath, "%.[^/\\]+$") ~= nil
 			placename = hasExtension and FilePath or (FilePath .. filetype)
+			placename = applyExportFolder(placename)
 		else
 			if not cachedPlaceName then
 				local ok, info =
@@ -4473,21 +4711,32 @@ local function synsaveinstance(...)
 			else
 				placename = sanitizeFileName("place " .. PlaceName)
 			end
+
+			placename = applyExportFolder(placename)
+
+			if OPTIONS.AvoidFileOverwrite and isfile then
+				local counter = 0
+				local temp = placename
+
+				while isfile(temp .. filetype) do
+					counter += 1
+					temp = placename .. "(" .. counter .. ")"
+				end
+
+				placename = temp .. filetype
+			else
+				placename = placename .. filetype
+			end
 		end
 
-		if FilePath then
-		elseif OPTIONS.AvoidFileOverwrite and isfile then
-			local counter = 0
-			local temp = placename
-
-			while isfile(temp .. filetype) do
-				counter += 1
-				temp = placename .. "(" .. counter .. ")"
+		do -- * Create the export folder when the executor exposes makefolder
+			local targetFolder = string.match(placename, "^(.*)[/\\][^/\\]*$")
+			if targetFolder and targetFolder ~= "" and makefolder then
+				pcall(makefolder, targetFolder)
+				if isfolder and not isfolder(targetFolder) then
+					warn("[saveinstance] Could not create export folder:", targetFolder)
+				end
 			end
-
-			placename = temp .. filetype
-		else
-			placename = placename .. filetype
 		end
 
 		local savedFiles = USSI.SavedFiles
@@ -5576,6 +5825,37 @@ local function synsaveinstance(...)
 		local refs, ordered = ctx.refs, ctx.ordered
 		local instCount, instTypeCount = ctx.instCount, ctx.instTypeCount
 
+		-- * Progress bar: each class bucket is weighted by instances × serialized properties.
+		local progressTotal, progressDone = 0, 0
+		local function bucketWork(objs)
+			local entry = entries[objs[1]]
+			local n = #objs
+			local count = 0
+
+			if entry.propsOnly then
+				for _ in entry.override.Properties do
+					count += 1
+				end
+			else
+				for _, prop in GetInheritedProps(entry.propClass) do
+					if not IgnoreProperties[prop.Name] then
+						count += 1
+					end
+				end
+			end
+
+			return count * n
+		end
+		for _, objs in classList do
+			progressTotal += bucketWork(objs)
+		end
+		progressTotal = math.max(progressTotal, 1)
+
+		local function advanceProgress(n)
+			progressDone = math.min(progressDone + n, progressTotal)
+			updateProgress(0.10 + 0.75 * (progressDone / progressTotal))
+		end
+
 		-- Chunk assembly
 
 		local chunks, propChunks = {}, {}
@@ -5673,11 +5953,14 @@ local function synsaveinstance(...)
 					local chunk = buildChunk("PROP", buf, not isSource and compress or nil) -- ! Assumes README is the only one that uses .Source, expect anything that does to be uncompressed
 					propChunks[#propChunks + 1] = chunk
 					totalsize += chunk.len + (chunk.str and #chunk.str or chunk.tailLen or 0)
+
+					advanceProgress(n)
 				end
 			elseif not skipProps then
 				for _, prop in GetInheritedProps(entry.propClass) do
 					local propName = prop.Name
 					if IgnoreProperties[propName] then
+						advanceProgress(n)
 						continue
 					end
 
@@ -5710,6 +5993,7 @@ local function synsaveinstance(...)
 						if __DEBUG_MODE then
 							__DEBUG_MODE("PROP dropped", class, propName, "n=" .. #objs, "failed at " .. failedAt)
 						end
+						advanceProgress(n)
 						continue
 					end
 
@@ -5734,7 +6018,13 @@ local function synsaveinstance(...)
 					else
 						warn("UNSUPPORTED BINARY TYPE (OPEN A GITHUB ISSUE): ", propName, binaryType)
 					end
+
+					advanceProgress(n)
 				end
+			end
+
+			if skipProps then
+				advanceProgress(bucketWork(objs))
 			end
 
 			classId += 1
@@ -5822,6 +6112,8 @@ local function synsaveinstance(...)
 			out[i] = buffer.tostring(chunkBuf)
 		end
 
+		updateProgress(0.85)
+
 		return out
 	end
 
@@ -5830,6 +6122,15 @@ local function synsaveinstance(...)
 		local savebuffer, savebuffer_size = {}, 1
 		local header = '<roblox version="4">'
 		local refs = ctx.refs
+
+		local progressTotal = math.max(ctx.instCount, 1)
+		local progressDone = 0
+		local function advanceXMLProgress()
+			progressDone += 1
+			if progressDone % 8 == 0 or progressDone >= progressTotal then
+				updateProgress(0.10 + 0.75 * math.min(progressDone / progressTotal, 1))
+			end
+		end
 
 		local function ReturnProperty(tag, propertyName, value)
 			return "<" .. tag .. ' name="' .. propertyName .. '">' .. value .. "</" .. tag .. ">"
@@ -6013,6 +6314,8 @@ local function synsaveinstance(...)
 
 				savebuffer[savebuffer_size] = "</Item>"
 				savebuffer_size += 1
+
+				advanceXMLProgress()
 			end
 		end
 
@@ -6047,6 +6350,9 @@ local function synsaveinstance(...)
 			"</roblox>"
 		savebuffer_size += 1
 		save_cache()
+
+		updateProgress(0.85)
+
 		return chunks
 	end
 
@@ -6057,6 +6363,11 @@ local function synsaveinstance(...)
 			or (NilInstances and global_container.getnilinstances) and true
 			or false
 		SaveNotCreatableWillBeEnabled = SaveNotCreatable
+
+		updateProgress(0)
+		if StatusText then
+			StatusText.Text = "Collecting instances..."
+		end
 
 		-- Register extras BEFORE collecting: they set InstancesOverrides, which
 		-- collect reads to decide tag/class/saveSpecific.
@@ -6149,6 +6460,11 @@ local function synsaveinstance(...)
 		You saved as XML, not Binary (rbxl). To convert: FILE -> Save to File As, name it .rbxl. This keeps the binary format and preserves properties ignored by IgnoreDefaultProperties.
 
 ]]
+			end
+
+			local legalNote = ""
+			if OPTIONS.TestOnlyNotice ~= false then
+				legalNote = LEGAL_README_TEXT .. "\n\n"
 			end
 
 			local helpText = [[
@@ -6292,6 +6608,7 @@ local function synsaveinstance(...)
 				return table.concat({
 					"--[[\n",
 					"\t\tThank you for using UniversalSynSaveInstance (Join to Copy Games) https://discord.gg/wx4ThpAsmw\n\n",
+					legalNote,
 					recoveredNote,
 					flattenedNote,
 					ghpFailureHeader,
@@ -6314,6 +6631,11 @@ local function synsaveinstance(...)
 		end
 
 		local ctx = collect(allRoots)
+
+		updateProgress(0.10)
+		if StatusText and not IsLoading then
+			StatusText.Text = "Encoding..."
+		end
 
 		-- collect filtered and deduped; recover each extra's surviving roots.
 		for _, extra in pendingExtras do
@@ -6386,8 +6708,10 @@ local function synsaveinstance(...)
 
 		if CopyToClipboard then
 			setrbxclipboard(table.concat(chunks))
+			updateProgress(1)
 		elseif Callback then
 			Callback(table.concat(chunks), chunks)
+			updateProgress(1)
 		elseif OPTIONS.AlternativeWritefile and appendfile then
 			-- Batch chunks into ~4MB appends: sizes come from #chunk, so nothing
 			-- is joined until a batch actually flushes. A whole-file concat would
@@ -6400,6 +6724,7 @@ local function synsaveinstance(...)
 					return
 				end
 				written += batchSize
+				updateProgress(0.85 + 0.15 * math.min(written / math.max(totalsize, 1), 1))
 				run_with_loading(
 					"Writing to File " .. math.round(written / totalsize * 100) .. "%",
 					nil,
@@ -6425,6 +6750,7 @@ local function synsaveinstance(...)
 						task.wait()
 					end
 					written += #chunk
+					updateProgress(0.85 + 0.15 * math.min(written / math.max(totalsize, 1), 1))
 				else
 					batch[#batch + 1] = chunk
 					batchSize += #chunk
@@ -6435,6 +6761,7 @@ local function synsaveinstance(...)
 			end
 
 			flush()
+			updateProgress(1)
 		elseif writefile then
 			run_with_loading(
 				"Writing " .. get_size_format() .. " to File",
@@ -6444,6 +6771,7 @@ local function synsaveinstance(...)
 				placename,
 				table.concat(chunks)
 			)
+			updateProgress(1)
 		end
 	end
 
@@ -6466,6 +6794,13 @@ local function synsaveinstance(...)
 			end
 		end
 	end
+
+	-- * 法律合规提示：必须在 KillAllScripts / SafeMode 等会改动游戏状态的操作之前显示
+	if not showTestOnlyNotice() then
+		Cleanup(true)
+		return error("saveinstance: cancelled at the test-only notice", 2)
+	end
+
 	do
 		local Players = service.Players
 
@@ -6587,6 +6922,38 @@ local function synsaveinstance(...)
 		StatusText.TextYAlignment = Enum.TextYAlignment.Top
 
 		StatusText.Parent = StatusGui
+
+		ProgressBar = Instance.new("Frame")
+		ProgressBar.Name = "Progress"
+		ProgressBar.AnchorPoint = Vector2.new(1, 0)
+		ProgressBar.Position = UDim2.new(1, 0, 0, 22)
+		ProgressBar.Size = UDim2.new(0.3, 0, 0, 14)
+		ProgressBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+		ProgressBar.BackgroundTransparency = 0.35
+		ProgressBar.BorderSizePixel = 0
+		ProgressBar.Visible = false
+		ProgressBar.Parent = StatusGui
+
+		ProgressFill = Instance.new("Frame")
+		ProgressFill.Name = "Fill"
+		ProgressFill.Size = UDim2.new(0, 0, 1, 0)
+		ProgressFill.BackgroundColor3 = Color3.fromRGB(0, 200, 110)
+		ProgressFill.BackgroundTransparency = 0.1
+		ProgressFill.BorderSizePixel = 0
+		ProgressFill.Parent = ProgressBar
+
+		ProgressLabel = Instance.new("TextLabel")
+		ProgressLabel.Name = "Percent"
+		ProgressLabel.Size = UDim2.new(1, 0, 1, 0)
+		ProgressLabel.BackgroundTransparency = 1
+		ProgressLabel.Font = Enum.Font.Code
+		ProgressLabel.TextSize = 14
+		ProgressLabel.TextScaled = true
+		ProgressLabel.TextColor3 = Color3.new(1, 1, 1)
+		ProgressLabel.TextStrokeTransparency = 0.7
+		ProgressLabel.Text = "0%"
+		ProgressLabel.ZIndex = 2
+		ProgressLabel.Parent = ProgressBar
 
 		local function randomString()
 			local length = math.random(10, 20)
