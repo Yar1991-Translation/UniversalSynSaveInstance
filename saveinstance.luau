@@ -90,6 +90,8 @@ do
 		-- getcon = 'string.find(...,"get",nil,true) and (string.find(...,"conn",nil,true) or string.find(...,"sig",nil,true)) and string.sub(...,#(...))=="s"',
 		getnilinstances = 'string.find(...,"nil",nil,true) and string.find(...,"get",nil,true) and string.sub(...,#...) == "s"', -- ! Could match some unwanted stuff
 		getscriptbytecode = 'string.find(...,"get",nil,true) and string.find(...,"script",nil,true) and string.find(...,"bytecode",nil,true)', --  or string.find(...,"dump",nil,true) and string.find(...,"string",nil,true) due to Fluxus (dumpstring returns a function)
+		getworkspace = 'string.find(...,"get",nil,true) and string.find(...,"work",nil,true)',
+		getexecutionfolder = 'string.find(...,"get",nil,true) and string.find(...,"exec",nil,true) and string.find(...,"folder",nil,true)',
 		-- hash = 'local a={...}local b=a[1]local function c(a,b)return string.find(a,b,nil,true)end;return c(b,"hash")and c(string.lower(tostring(a[2])),"crypt")',
 		protectgui = 'string.find(...,"protect",nil,true) and string.find(...,"ui",nil,true) and not string.find(...,"un",nil,true)',
 		setrbxclipboard = 'string.find(...,"set",nil,true) and string.find(...,"rbx",nil,true) and string.find(...,"clipboard",nil,true)',
@@ -3656,7 +3658,7 @@ end
 --- @field CompressionMode string | boolean -- How to compress (make smaller) the binary file: `"zstd"`, `"lz4"`, or `false` for no compression. `true` means `"zstd"`. The old option `DisableCompression = true` means `false`. ___Default:___ `"zstd"`
 --- @field CompressionLevel number -- Compression level for zstd, from -7 to 22. A higher level makes a smaller file but takes longer. This is ignored for lz4 and when compression is off. ___Default:___ 9
 --- @field FilePath string | false -- File name to save to. You can include a folder. If the name has no extension, the script adds one based on `Binary` and `IsModel`. If you set this, the script overwrites an existing file and ignores `AvoidFileOverwrite`. ___Default:___ false
---- @field ExportFolder string | false -- Directory where the exported file is placed. The directory is created automatically when the executor supports `makefolder`. A relative path is resolved from the executor's workspace folder; an absolute path (`/...` or `C:/...`) is used as-is when the executor supports it. If `FilePath` is absolute, `FilePath` wins. ___Default:___ false
+--- @field ExportFolder string | false -- Directory where the exported file is placed. The directory is created automatically when the executor supports `makefolder`. A relative path is resolved from the executor's workspace folder; an absolute path (`/...` or `C:/...`) is used as-is when the executor supports it. If `FilePath` is absolute, `FilePath` wins. After saving, the absolute output path is printed when the executor exposes a workspace path function such as `getworkspace()`. ___Default:___ false
 --- @field SafeMode boolean -- Disconnect the LocalPlayer from the game when saving starts. This turns on `KillAllScripts` and `BoostFPS` unless you set them yourself. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field KillAllScripts boolean -- Close or disable other running scripts before saving. `SafeMode` turns this on. Some games stop responding to input after this. That is normal. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field BoostFPS boolean -- Turn off 3D rendering while saving, then turn it back on. `SafeMode` turns this on. ___Default:___ false
@@ -4873,6 +4875,60 @@ local function synsaveinstance(...)
 		end
 
 		return Size
+	end
+
+	-- * 导出完成后尽量把执行器工作目录和相对文件名拼成绝对路径，供控制台显示。
+	local function isAbsoluteOutputPath(path)
+		return string.sub(path, 1, 1) == "/"
+			or string.match(path, "^%a:[/\\]") ~= nil
+			or string.sub(path, 1, 2) == "\\\\"
+	end
+
+	local function getExecutorWorkspacePath()
+		local gc = global_container or {}
+		local candidates = {
+			gc.getworkspace,
+			gc.getexecutionfolder,
+			gc.getworkspacepath,
+			gc.getexecutorpath,
+			rawget(GLOBAL_ENV, "getworkspace"),
+			rawget(GLOBAL_ENV, "getexecutionfolder"),
+			rawget(GLOBAL_ENV, "getworkspacepath"),
+			rawget(GLOBAL_ENV, "getexecutorpath"),
+			rawget(_G, "getworkspace"),
+			rawget(_G, "getexecutionfolder"),
+			rawget(_G, "getworkspacepath"),
+			rawget(_G, "getexecutorpath"),
+		}
+
+		for _, fn in candidates do
+			if type(fn) == "function" then
+				local ok, path = pcall(fn)
+				if ok and type(path) == "string" and path ~= "" then
+					return path
+				end
+			end
+		end
+	end
+
+	local function resolveAbsoluteOutputPath(path)
+		if not path or path == "" then
+			return nil
+		end
+		if isAbsoluteOutputPath(path) then
+			return path
+		end
+
+		local workspace = getExecutorWorkspacePath()
+		if workspace then
+			workspace = string.gsub(workspace, "\\", "/")
+			workspace = string.gsub(workspace, "/+$", "")
+			if workspace ~= "" then
+				return workspace .. "/" .. path
+			end
+		end
+
+		return path
 	end
 
 	local lastYield = os.clock()
@@ -7538,6 +7594,20 @@ local function synsaveinstance(...)
 
 	if not ok then
 		return error(err, 2)
+	end
+
+	if not (CopyToClipboard or Callback) and placename then
+		local absolutePath = resolveAbsoluteOutputPath(placename)
+		if absolutePath then
+			USSI.LastOutputPath = absolutePath
+			USSI.LastOutputPathPrinted = true
+			print("[saveinstance] 导出完成 / Export complete: " .. absolutePath)
+			if absolutePath == placename and not isAbsoluteOutputPath(placename) then
+				print(
+					"[saveinstance] 注意: 执行器未提供工作目录函数（如 getworkspace），以上为相对路径；文件位于执行器工作目录下。"
+				)
+			end
+		end
 	end
 
 	if OPTIONS.ShutdownWhenDone then

@@ -17,6 +17,7 @@ Do not use them commercially or redistribute them. Use at your own risk.
 
 - `ExportFolder`：自定义导出目录（自动尝试创建）。相对路径基于执行器工作目录；`C:/...` 或 `/...` 等绝对路径在支持它的执行器中会直接使用。
 - 导出进度条：`ShowStatus = true`（默认）时，屏幕右上角会显示导出百分比进度条。
+- 导出完成后会在控制台打印文件的绝对路径（执行器提供 `getworkspace()` 等函数时）；如果执行器只支持相对路径，会打印相对路径并给出提示。
 - `TestOnlyNotice` / `TestOnlyNoticeTimeout`：导出前显示“仅供测试，24 小时内删除”提示。默认 15 秒后自动继续；设为 `0` 或负数则必须手动点击确认。`ReadMe = true`（默认）时，导出文件内的 README 脚本也会包含该提示。
 
 # Loadstring
@@ -36,7 +37,9 @@ local Options = { -- Documentation here https://luau.github.io/UniversalSynSaveI
 synsaveinstance(Options)
 ```
 
+# 测试脚本
 
+- `test_export_path_display.luau`：导出一个临时模型，验证导出完成后控制台是否显示文件的绝对路径。
 
 # 💖 Support Us & Our Work
 
