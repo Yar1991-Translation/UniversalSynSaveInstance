@@ -32,6 +32,7 @@ local function arrayToDict(t, mixedMode, valueOverride, typeStrict)
 end
 
 local GLOBAL_ENV = getgenv and getgenv() or _G or shared
+local USSI_REPO_URL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/"
 
 -- * Single shared-env entry point: caches expensive per-session state (place name, decompile cache, ...)
 -- * so a full script reload doesn't have to rebuild it.
@@ -64,7 +65,7 @@ do
 	local filename = "StreamBuffer"
 
 	StreamBuffer = loadstring(
-		game:HttpGet("https://raw.githubusercontent.com/rbxlx/SomeHub/main/" .. filename .. ".luau", true),
+		game:HttpGet(USSI_REPO_URL .. "libs/" .. filename .. ".luau", true),
 		filename
 	)()
 end
@@ -75,7 +76,7 @@ do
 
 	local finder
 	finder, global_container = loadstring(
-		game:HttpGet("https://raw.githubusercontent.com/rbxlx/SomeHub/main/" .. filename .. ".luau", true),
+		game:HttpGet(USSI_REPO_URL .. "libs/" .. filename .. ".luau", true),
 		filename
 	)()
 
@@ -3796,7 +3797,7 @@ end
 	Save the current place, one [Instance], or a group of [Instance]s. Example:
 	```lua
 	local Params = {
-		RepoURL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/",
+		RepoURL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/",
 		SSI = "saveinstance",
 	}
 
@@ -7389,10 +7390,7 @@ local function synsaveinstance(...)
 			local rbxcrypt_encode, rbxcrypt_decode
 			pcall(function()
 				local rbxcrypt_b64 = loadstring(
-					game:HttpGet(
-						"https://raw.githubusercontent.com/daily3014/rbx-algorithms/refs/heads/main/src/Encoding/Base64.luau",
-						true
-					),
+					game:HttpGet(USSI_REPO_URL .. "libs/Base64.luau", true),
 					"Base64"
 				)()
 				local enc = rbxcrypt_b64.Encode
@@ -7514,7 +7512,7 @@ local function synsaveinstance(...)
 			local llz4_compress
 			pcall(function()
 				local llz4 = loadstring(
-					game:HttpGet("https://raw.githubusercontent.com/RiskoZS/llz4/refs/heads/main/llz4.luau", true),
+					game:HttpGet(USSI_REPO_URL .. "libs/llz4.luau", true),
 					"llz4"
 				)()
 				llz4_compress = llz4.compress

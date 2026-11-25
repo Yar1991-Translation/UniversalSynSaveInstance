@@ -2,7 +2,7 @@
 -- 功能：完整保存 + 反编译 + 字节码 + 安全模式 + Nil 实例 + 自定义导出目录 + 进度条 + 仅供测试提示
 
 local Params = {
-	RepoURL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/",
+	RepoURL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/",
 	SSI = "saveinstance",
 }
 

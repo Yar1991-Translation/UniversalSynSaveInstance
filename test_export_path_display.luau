@@ -3,7 +3,7 @@
 -- 运行方法：在 Roblox 执行器中执行本脚本，等待测试完成，然后看控制台输出。
 -- 本测试只保存一个临时 Folder + Part，完成后会尝试删除导出文件。
 
-local REPO_URL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/"
+local REPO_URL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/"
 local TEST_FOLDER = "export_path_test"
 -- 可选：执行器没有 getworkspace() 时手动填写其工作目录
 -- Solara 当前工作区: D:/solara/workspace

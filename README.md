@@ -1,6 +1,7 @@
 # UniversalSynSaveInstance（Fork）
 
 上游项目：https://github.com/luau/UniversalSynSaveInstance
+Gitee 镜像（当前加载地址）：https://gitee.com/lofblogac/UniversalSynSaveInstance
 本 Fork 新增了自定义导出目录、导出进度条和仅供测试提示，详见下方。
 
 # ⚠️ 仅供测试 / FOR TESTING ONLY
@@ -25,7 +26,7 @@ Do not use them commercially or redistribute them. Use at your own risk.
 
 ```lua
 local Params = {
- RepoURL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/",
+ RepoURL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/",
  SSI = "saveinstance",
 }
 local synsaveinstance = loadstring(game:HttpGet(Params.RepoURL .. Params.SSI .. ".luau", true), Params.SSI)()

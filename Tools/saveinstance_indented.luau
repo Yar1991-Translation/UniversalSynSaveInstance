@@ -2,8 +2,8 @@
 -- https://discord.gg/wx4ThpAsmw
 
 local Params = {
-	RepoURL = "https://raw.githubusercontent.com/rbxlx/SomeHub/main/",
-	UMF = "UniversalMethodFinder",
+	RepoURL = "https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/",
+	UMF = "libs/UniversalMethodFinder",
 }
 local finder, globalcontainer = loadstring(game:HttpGet(Params.RepoURL .. Params.UMF .. ".luau", true), Params.UMF)()
 
@@ -103,7 +103,7 @@ do
 		table.freeze(bit32)
 	end
 	local Base64_Encode_Buffer = loadstring(
-		game:HttpGet("https://raw.githubusercontent.com/Reselim/Base64/master/Base64.lua", true),
+		game:HttpGet("https://gitee.com/lofblogac/UniversalSynSaveInstance/raw/main/libs/Base64.luau", true),
 		"Base64"
 	)().encode
 	Base64_Encode = function(raw) -- ? Reselim broke all scripts that rely on their Base64 Implementation because they changed to buffers from strings (both as input & output)
