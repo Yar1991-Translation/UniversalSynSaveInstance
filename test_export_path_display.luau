@@ -6,8 +6,8 @@
 local REPO_URL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/"
 local TEST_FOLDER = "export_path_test"
 -- 可选：执行器没有 getworkspace() 时手动填写其工作目录
--- Solara (Documents 重定向) 通常是: D:/UserData/Documents/solara/workspace
-local MANUAL_WORKSPACE = "D:/UserData/Documents/solara/workspace"
+-- Solara 当前工作区: D:/solara/workspace
+local MANUAL_WORKSPACE = "D:/solara/workspace"
 
 local ENV = (getgenv and getgenv()) or _G
 

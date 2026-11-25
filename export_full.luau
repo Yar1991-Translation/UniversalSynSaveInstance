@@ -24,8 +24,8 @@ local CustomOptions = {
 	ExportFolder = "export",
 
 	-- Solara 的工作目录（用于把相对路径显示成绝对路径）
-	-- 如果你的 Documents 没有重定向，通常可以用 getworkspace() 自动获取，无需设置这一项
-	WorkspacePath = "D:/UserData/Documents/solara/workspace",
+	-- 如果你的执行器支持 getworkspace()，可以删掉这一项让脚本自动获取
+	WorkspacePath = "D:/solara/workspace",
 
 	-- 导出前“仅供测试，24 小时内删除”提示
 	TestOnlyNotice = true,
