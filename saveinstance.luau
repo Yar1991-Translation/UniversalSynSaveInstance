@@ -3659,6 +3659,7 @@ end
 --- @field CompressionLevel number -- Compression level for zstd, from -7 to 22. A higher level makes a smaller file but takes longer. This is ignored for lz4 and when compression is off. ___Default:___ 9
 --- @field FilePath string | false -- File name to save to. You can include a folder. If the name has no extension, the script adds one based on `Binary` and `IsModel`. If you set this, the script overwrites an existing file and ignores `AvoidFileOverwrite`. ___Default:___ false
 --- @field ExportFolder string | false -- Directory where the exported file is placed. The directory is created automatically when the executor supports `makefolder`. A relative path is resolved from the executor's workspace folder; an absolute path (`/...` or `C:/...`) is used as-is when the executor supports it. If `FilePath` is absolute, `FilePath` wins. After saving, the absolute output path is printed when the executor exposes a workspace path function such as `getworkspace()`. ___Default:___ false
+--- @field WorkspacePath string | false -- Manually set the executor's workspace folder on disk. This is only used to display the absolute output path when the executor does not expose `getworkspace()` or similar. It does not change where files are written. For Solara, this is usually `D:/UserData/Documents/solara/workspace` when Documents is redirected. ___Default:___ false
 --- @field SafeMode boolean -- Disconnect the LocalPlayer from the game when saving starts. This turns on `KillAllScripts` and `BoostFPS` unless you set them yourself. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field KillAllScripts boolean -- Close or disable other running scripts before saving. `SafeMode` turns this on. Some games stop responding to input after this. That is normal. **HIGHLY RECOMMENDED.** ___Default:___ false
 --- @field BoostFPS boolean -- Turn off 3D rendering while saving, then turn it back on. `SafeMode` turns this on. ___Default:___ false
@@ -3724,6 +3725,7 @@ end
 --- @field Decompiler string -- `Decompile`
 --- @field DecompilerTimeout string -- `DecompileTimeout`
 --- @field EmbedBytecode string -- `SaveBytecode`
+--- @field ExecutorWorkspace string -- `WorkspacePath`
 --- @field ExportDirectory string -- `ExportFolder`
 --- @field FileName string -- `FilePath`
 --- @field IgnoreArchivable string -- `IgnoreNotArchivable`
@@ -3768,6 +3770,8 @@ end
 --- @field TestOnly string -- `TestOnlyNotice`
 --- @field UseDecompiler string -- `Decompile`
 --- @field Verbose string -- `__DEBUG_MODE`
+--- @field WorkspaceRoot string -- `WorkspacePath`
+--- @field AbsolutePathRoot string -- `WorkspacePath`
 --- @field timeout string -- `DecompileTimeout`
 
 --- @interface OptionsAliasesInverse
@@ -3908,6 +3912,7 @@ local function synsaveinstance(...)
 		ReadMe = true,
 		FilePath = false,
 		ExportFolder = false,
+		WorkspacePath = false,
 		AvoidFileOverwrite = true,
 		Object = false,
 		IsModel = false,
@@ -3973,6 +3978,7 @@ local function synsaveinstance(...)
 			Decompiler = "Decompile",
 			DecompilerTimeout = "DecompileTimeout",
 			EmbedBytecode = "SaveBytecode",
+			ExecutorWorkspace = "WorkspacePath",
 			ExportDirectory = "ExportFolder",
 			FileName = "FilePath",
 			IgnoreArchivable = "IgnoreNotArchivable",
@@ -4017,6 +4023,8 @@ local function synsaveinstance(...)
 			TestOnly = "TestOnlyNotice",
 			UseDecompiler = "Decompile",
 			Verbose = "__DEBUG_MODE",
+			WorkspaceRoot = "WorkspacePath",
+			AbsolutePathRoot = "WorkspacePath",
 			timeout = "DecompileTimeout",
 		},
 		OptionsAliasesInverse = {
@@ -4885,6 +4893,11 @@ local function synsaveinstance(...)
 	end
 
 	local function getExecutorWorkspacePath()
+		local manual = OPTIONS.WorkspacePath
+		if type(manual) == "string" and manual ~= "" then
+			return manual
+		end
+
 		local gc = global_container or {}
 		local candidates = {
 			gc.getworkspace,

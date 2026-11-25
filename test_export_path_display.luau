@@ -5,6 +5,9 @@
 
 local REPO_URL = "https://raw.githubusercontent.com/Yar1991-Translation/UniversalSynSaveInstance/main/"
 local TEST_FOLDER = "export_path_test"
+-- 可选：执行器没有 getworkspace() 时手动填写其工作目录
+-- Solara (Documents 重定向) 通常是: D:/UserData/Documents/solara/workspace
+local MANUAL_WORKSPACE = "D:/UserData/Documents/solara/workspace"
 
 local ENV = (getgenv and getgenv()) or _G
 
@@ -31,6 +34,9 @@ local function isAbsolute(path)
 end
 
 local function getWorkspacePath()
+	if MANUAL_WORKSPACE and MANUAL_WORKSPACE ~= "" then
+		return MANUAL_WORKSPACE
+	end
 	if not getworkspace then
 		return nil
 	end
@@ -63,6 +69,7 @@ end
 print("==============================================")
 print("[TEST] 导出路径显示测试")
 print("[TEST] 工作目录函数:", getworkspace and "可用" or "不可用")
+print("[TEST] 手动工作目录:", MANUAL_WORKSPACE ~= "" and MANUAL_WORKSPACE or "未设置")
 
 if not writefile then
 	warn("[TEST FAIL] 当前执行器没有 writefile，无法导出。")
@@ -97,6 +104,7 @@ local options = {
 	ExtraInstances = { folder },
 	IsModel = true,
 	ExportFolder = TEST_FOLDER,
+	WorkspacePath = MANUAL_WORKSPACE ~= "" and MANUAL_WORKSPACE or nil,
 	Decompile = false,
 	SaveBytecode = false,
 	ReadMe = false,

@@ -23,6 +23,10 @@ local CustomOptions = {
 	-- 保存完成后控制台会打印实际文件的绝对路径
 	ExportFolder = "export",
 
+	-- Solara 的工作目录（用于把相对路径显示成绝对路径）
+	-- 如果你的 Documents 没有重定向，通常可以用 getworkspace() 自动获取，无需设置这一项
+	WorkspacePath = "D:/UserData/Documents/solara/workspace",
+
 	-- 导出前“仅供测试，24 小时内删除”提示
 	TestOnlyNotice = true,
 	TestOnlyNoticeTimeout = 15, -- 15 秒后自动继续；设为 0 则必须手动点击确认
